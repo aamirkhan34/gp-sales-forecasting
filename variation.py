@@ -3,6 +3,10 @@ import random
 import numpy as np
 
 
+import selection
+import population
+
+
 def check_max_prog_size(MAX_PROGRAM_SIZE):
     pass
 
@@ -53,11 +57,75 @@ def swap_mutation(offspring):
     return offspring
 
 
-def mutation(offsprings):
+def get_flipped_value(old_value, choice_list):
+    new_choice_list = [x for x in choice_list if x != old_value]
+    new_value = population.uniform_random_choice(new_choice_list)
+    return new_value
+
+
+def flip_bit_mutation(individual, source_x, target_r, source_r, ops):
+    mutated_individual = [[bit for bit in instruction]
+                          for instruction in individual]
+
+    flip_choice = ["target", "operator", "source"]
+    to_be_flipped = population.uniform_random_choice(flip_choice)
+
+    instruction_indices = list(range(0, len(individual)))
+    to_be_mutated = population.uniform_random_choice(instruction_indices)
+
+    # Flipping
+    if to_be_flipped == "target":
+        cur_target = individual[to_be_mutated][1]
+        new_target = get_flipped_value(cur_target, target_r)
+        mutated_individual[to_be_mutated][1] = new_target
+        # print("target", to_be_mutated, cur_target, new_target)
+
+    elif to_be_flipped == "operator":
+        cur_op = individual[to_be_mutated][2]
+        new_op = get_flipped_value(cur_op, ops)
+        mutated_individual[to_be_mutated][2] = new_op
+        # print("operator", to_be_mutated, cur_op, new_op)
+
+    else:
+        cur_source = individual[to_be_mutated][3]
+        cur_select = individual[to_be_mutated][0]
+        if cur_select:
+            new_source = get_flipped_value(cur_source, source_r)
+        else:
+            new_source = get_flipped_value(cur_source, source_x)
+        mutated_individual[to_be_mutated][3] = new_source
+        # print("source", to_be_mutated, cur_source, new_source)
+
+    # print(mutated_individual)
+    return mutated_individual
+
+
+def compare_fitness_scores(offspring, offspring_mutated, vr_obj, X_train_t, y_train_t, register_class_map):
+    # Update detection tracker for best individual
+    fit_score_offspring = selection.get_fitness_score_of_program(
+        offspring, vr_obj, X_train_t, y_train_t, register_class_map, None, None, False)
+
+    # Update detection tracker for best individual
+    fit_score_offspring_mutated = selection.get_fitness_score_of_program(
+        offspring_mutated, vr_obj, X_train_t, y_train_t, register_class_map, None, None, False)
+
+    return fit_score_offspring == fit_score_offspring_mutated
+
+
+def mutation(offsprings, source_x, target_r, source_r, ops, vr_obj, X_train_t, y_train_t, register_class_map):
     mutated_offsprings = []
 
     for offspring in offsprings:
-        mutated_offspring = swap_mutation(offspring)
+        # mutated_offspring = swap_mutation(offspring)
+        mutated_offspring = flip_bit_mutation(
+            offspring, source_x, target_r, source_r, ops)
+
+        # Keep on mutating until fitness score is different from original offspring
+        # while(compare_fitness_scores(offspring, mutated_offspring, vr_obj, X_train_t,
+        #                              y_train_t, register_class_map)):
+        #     mutated_offspring = flip_bit_mutation(
+        #         mutated_offspring, source_x, target_r, source_r, ops)
+
         mutated_offsprings.append(mutated_offspring)
 
     return mutated_offsprings

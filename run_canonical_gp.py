@@ -13,6 +13,10 @@ import numpy as np
 import pandas as pd
 
 # application imports
+import iris
+import shuttle
+import thyroid
+import tic_tac_toe
 import operations
 import population
 import prediction
@@ -32,19 +36,28 @@ if __name__ == '__main__':
                    help='Gap percentage for breeder model (value between 10-30), default to 20',
                    choices=[10, 15, 20, 25, 30], default=20)
     p.add_argument('--d', metavar='dataset', type=str,
-                   help='Dataset to be used, default to iris', choices=["iris", "tic-tac-toe"], default="iris")
+                   help='Dataset to be used, default to thyroid', choices=["iris", "tic-tac-toe", "shuttle", "thyroid"],
+                   default="thyroid")
     p.add_argument('--p', metavar='population_size', type=int,
-                   help='Size of population, default to 100', choices=[100, 500, 1000, 5000, 10000], default=100)
+                   help='Size of population, default to 500', choices=[100, 500, 1000, 5000, 10000], default=500)
     p.add_argument('--g', metavar='Number of generations', type=int,
-                   help='Number of generations, default to 100', choices=[100, 500, 1000], default=100)
+                   help='Number of generations, default to 1000', choices=[100, 500, 1000], default=1000)
     p.add_argument('--nr', metavar='Number of registers', type=int,
                    help='Number of registers, default to 4', default=4)
+    p.add_argument('--t', metavar='Training subset size', type=int,
+                   help='Training subset size, default to 200', choices=[200, 300, 500], default=200)
+    p.add_argument('--st', metavar='Sampling technique', type=str,
+                   help="Sampling technique, default to 'uniformly'", choices=["uniformly", "equally"],
+                   default="uniformly")
+    p.add_argument('--rp', metavar='Re-sampling period', type=int,
+                   help='Re-sampling period, default to 5 generations', choices=[5, 10, 15, 20, 25], default=5)
 
     args = p.parse_args()
 
     print('Parameters:')
     print("""\tTest data porportion: %d\n\tGap percentage: %d\n\tPopulation size: %d\n\tNumber of Generations: %d
-        Dataset: %s""" % (args.tdp, args.gap, args.p, args.g, args.d))
+        Dataset: %s\n\tSampling technique: %s\n\tTraining subset size: %d\n\tResampling period: %d"""
+          % (args.tdp, args.gap, args.p, args.g, args.d, args.st, args.t, args.rp))
 
     # OTHER PARAMETERS
     MAX_PROGRAM_SIZE = 64
@@ -56,29 +69,31 @@ if __name__ == '__main__':
         operators_mapping = {0: operations.add, 1: operations.sub,
                              2: operations.mul_by_2, 3: operations.div_by_2}
 
+        data_module_mapping = {"shuttle": shuttle, "thyroid": thyroid,
+                               "tic-tac-toe": tic_tac_toe, "iris": iris}
+
+        # Load dataset
+        df = data_module_mapping[args.d].load_dataset(args.d)
+
+        # Validate and get number of registers
+        NUMBER_OF_REGISTERS = data_module_mapping[args.d].validate_get_register_count(
+            NUMBER_OF_REGISTERS, df)
+
         vr_obj = VariableReference(NUMBER_OF_REGISTERS)
         print('\nInitial Registers:')
         print(vr_obj.get_registers())
 
-        # Load dataset
-        df = pd.read_csv(args.d+"/"+args.d+".data", header=None)
-
-        # One-hot-encode attributes if tic-tac-toe dataset
-        if args.d == "tic-tac-toe":
-            df = pd.get_dummies(df, columns=list(
-                df.columns.values)[:-1], drop_first=True)
-            # Removing & appending label column at the end and renaming the columns
-            col_9 = df.pop(9)
-            df[9] = col_9
-            df.columns = list(range(len(df.columns.values)))
+        # Preprocess
+        df = data_module_mapping[args.d].preprocess_data(df)
 
         # Initialize population: returns list of individuals
         program_list = population.initialize_population(
-            df, operators_mapping, args.p)
+            df, operators_mapping, args.p, NUMBER_OF_REGISTERS)
 
         # Run GP
         generation.run_each_generation(
-            program_list, args.g, df, args.gap, args.tdp, MAX_PROGRAM_SIZE, args.d, NUMBER_OF_REGISTERS, vr_obj)
+            program_list, args.g, df, args.gap, args.tdp, MAX_PROGRAM_SIZE, args.d,
+            NUMBER_OF_REGISTERS, vr_obj, data_module_mapping, args.t, args.rp, args.st)
 
         print('Overall time: '+str(round(timeit.default_timer() -
                                          overall_start, 3))+' seconds.\n')

@@ -39,12 +39,45 @@ def check_classification(registers, register_class_map, actual_prediction):
     return False
 
 
-def get_fitness_scores(fitness_scores, program_list, vr_obj, X_train, y_train, register_class_map, gen, gap):
+def get_fitness_score_of_program(program, vr_obj, X_train, y_train, register_class_map, gen, dt_obj, det_track_req):
+    operators_mapping = {0: operations.add, 1: operations.sub,
+                         2: operations.mul_by_2, 3: operations.div_by_2}
+    fitness_score = 0
+
+    for idx in range(len(X_train)):
+        # Reset and get registers
+        vr_obj.reset_registers()
+        registers = vr_obj.get_registers()
+
+        for instruction in program:
+            # Decode and Execute
+            registers = decode_execute_instruction(
+                X_train[idx], instruction, operators_mapping, registers)
+
+        match_check = check_classification(
+            registers, register_class_map, y_train[idx])
+
+        # Update detection tracking if required - total
+        if det_track_req:
+            dt_obj.set_label_wise_tracker_total(y_train[idx], gen)
+
+        if match_check:
+            fitness_score += 1
+            # Update detection tracking if required - true positive
+            if det_track_req:
+                dt_obj.set_label_wise_tracker_tp(
+                    y_train[idx], gen, match_check)
+
+    return fitness_score
+
+
+def get_fitness_scores(fitness_scores, program_list, vr_obj, X_train, y_train, register_class_map,
+                       gen, gap, sample_flag, dt_obj):
     operators_mapping = {0: operations.add, 1: operations.sub,
                          2: operations.mul_by_2, 3: operations.div_by_2}
 
     # Change range if
-    if gen > 0:
+    if gen > 0 and not sample_flag:
         rg = range(int(len(program_list)*(1-gap/100)),
                    len(program_list))
     else:
@@ -77,14 +110,14 @@ def get_fitness_scores(fitness_scores, program_list, vr_obj, X_train, y_train, r
 def save_fittest_individual(program, fitness_score, register_class_map, dataset):
     data = {}
 
-    if "best_programs" not in os.listdir():
-        os.makedirs("best_programs")
+    if "fittest_programs" not in os.listdir():
+        os.makedirs("fittest_programs")
 
-    if dataset not in os.listdir("best_programs/"):
-        os.makedirs("best_programs/"+dataset)
+    if dataset not in os.listdir("fittest_programs/"):
+        os.makedirs("fittest_programs/"+dataset)
 
-    if "best_program.json" in os.listdir("best_programs/"+dataset+"/"):
-        with open("best_programs/"+dataset+"/best_program.json", "r") as json_file:
+    if "fittest_program.json" in os.listdir("fittest_programs/"+dataset+"/"):
+        with open("fittest_programs/"+dataset+"/fittest_program.json", "r") as json_file:
             data = json.load(json_file)
 
     if data:
@@ -93,14 +126,14 @@ def save_fittest_individual(program, fitness_score, register_class_map, dataset)
             data["program"] = str(program)
             data["label_mapping"] = str(register_class_map)
 
-            with open("best_programs/"+dataset+"/best_program.json", 'w') as outfile:
+            with open("fittest_programs/"+dataset+"/fittest_program.json", 'w') as outfile:
                 json.dump(data, outfile)
     else:
         data["fitness_score"] = fitness_score
         data["program"] = str(program)
         data["label_mapping"] = str(register_class_map)
 
-        with open("best_programs/"+dataset+"/best_program.json", 'w') as outfile:
+        with open("fittest_programs/"+dataset+"/fittest_program.json", 'w') as outfile:
             json.dump(data, outfile)
 
 
