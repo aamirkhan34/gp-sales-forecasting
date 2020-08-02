@@ -2,6 +2,7 @@ import os
 import json
 import random
 import operations
+import prediction
 import numpy as np
 import pandas as pd
 
@@ -25,54 +26,42 @@ def decode_execute_instruction(row, instruction, operators_mapping, registers):
     return registers
 
 
-def check_classification(registers, register_class_map, actual_prediction):
-    sorted_registers = {k: v for k, v in sorted(
-        registers.items(), key=lambda item: item[1], reverse=True)}
-
-    for k in sorted_registers:
-        if k in register_class_map.keys():
-            if register_class_map[k] == actual_prediction:
-                return True
-            else:
-                return False
-
-    return False
-
-
-def get_fitness_score_of_program(program, vr_obj, X_train, y_train, register_class_map, gen, dt_obj, det_track_req):
+def get_fitness_error_score_of_program(program, X_train, y_train, NUMBER_OF_REGISTERS, gen, dt_obj, det_track_req):
     operators_mapping = {0: operations.add, 1: operations.sub,
                          2: operations.mul_by_2, 3: operations.div_by_2}
-    fitness_score = 0
 
-    for idx in range(len(X_train)):
-        # Reset and get registers
-        vr_obj.reset_registers()
-        registers = vr_obj.get_registers()
+    # Predict
+    y_pred = prediction.predict(X_train, program, NUMBER_OF_REGISTERS)
 
-        for instruction in program:
-            # Decode and Execute
-            registers = decode_execute_instruction(
-                X_train[idx], instruction, operators_mapping, registers)
+    fitness_error_score = prediction.get_mae_prediction_error(y_pred, y_train)
 
-        match_check = check_classification(
-            registers, register_class_map, y_train[idx])
+    # for idx in range(len(X_train)):
+    #     # Reset and get registers
+    #     vr_obj.reset_registers()
+    #     registers = vr_obj.get_registers()
 
-        # Update detection tracking if required - total
-        if det_track_req:
-            dt_obj.set_label_wise_tracker_total(y_train[idx], gen)
+    #     for instruction in program:
+    #         # Decode and Execute
+    #         registers = decode_execute_instruction(
+    #             X_train[idx], instruction, operators_mapping, registers)
 
-        if match_check:
-            fitness_score += 1
-            # Update detection tracking if required - true positive
-            if det_track_req:
-                dt_obj.set_label_wise_tracker_tp(
-                    y_train[idx], gen, match_check)
+    #     # y_pred =
 
-    return fitness_score
+    #     # # Update detection tracking if required - total
+    #     # if det_track_req:
+    #     #     dt_obj.set_label_wise_tracker_total(y_train[idx], gen)
+
+    #     sum_fitness_error_score += pred_error_score
+    #     # # Update detection tracking if required - true positive
+    #     # if det_track_req:
+    #     #     dt_obj.set_label_wise_tracker_tp(
+    #     #         y_train[idx], gen, match_check)
+
+    return fitness_error_score
 
 
-def get_fitness_scores(fitness_scores, program_list, vr_obj, X_train, y_train, register_class_map,
-                       gen, gap, sample_flag, dt_obj):
+def get_fitness_error_scores(fitness_error_scores, program_list, vr_obj, X_train, y_train, NUMBER_OF_REGISTERS,
+                             gen, gap, sample_flag, dt_obj):
     operators_mapping = {0: operations.add, 1: operations.sub,
                          2: operations.mul_by_2, 3: operations.div_by_2}
 
@@ -84,30 +73,32 @@ def get_fitness_scores(fitness_scores, program_list, vr_obj, X_train, y_train, r
         rg = range(len(program_list))
 
     for pidx in rg:
-        fitness_score = 0
 
-        for idx in range(len(X_train)):
-            # Reset and get registers
-            vr_obj.reset_registers()
-            registers = vr_obj.get_registers()
+        fitness_error_score = get_fitness_error_score_of_program(
+            program_list[pidx], X_train, y_train, NUMBER_OF_REGISTERS, gen, dt_obj, False)
 
-            for instruction in program_list[pidx]:
-                # Decode and Execute
-                registers = decode_execute_instruction(
-                    X_train[idx], instruction, operators_mapping, registers)
+        # for idx in range(len(X_train)):
+        #     # Reset and get registers
+        #     vr_obj.reset_registers()
+        #     registers = vr_obj.get_registers()
 
-            match_check = check_classification(
-                registers, register_class_map, y_train[idx])
+        #     for instruction in program_list[pidx]:
+        #         # Decode and Execute
+        #         registers = decode_execute_instruction(
+        #             X_train[idx], instruction, operators_mapping, registers)
 
-            if match_check:
-                fitness_score += 1
+        #     match_check = check_classification(
+        #         registers, register_class_map, y_train[idx])
 
-        fitness_scores[pidx] = fitness_score
+        #     if match_check:
+        #         fitness_score += 1
 
-    return fitness_scores
+        fitness_error_scores[pidx] = fitness_error_score
+
+    return fitness_error_scores
 
 
-def save_fittest_individual(program, fitness_score, register_class_map, dataset):
+def save_fittest_individual(program, fitness_error_score, dataset):
     data = {}
 
     if "fittest_programs" not in os.listdir():
@@ -121,30 +112,30 @@ def save_fittest_individual(program, fitness_score, register_class_map, dataset)
             data = json.load(json_file)
 
     if data:
-        if data["fitness_score"] < fitness_score:
-            data["fitness_score"] = fitness_score
+        if data["fitness_error_score"] > fitness_error_score:
+            data["fitness_error_score"] = fitness_error_score
             data["program"] = str(program)
-            data["label_mapping"] = str(register_class_map)
+            # data["label_mapping"] = str(register_class_map)
 
             with open("fittest_programs/"+dataset+"/fittest_program.json", 'w') as outfile:
                 json.dump(data, outfile)
     else:
-        data["fitness_score"] = fitness_score
+        data["fitness_error_score"] = fitness_error_score
         data["program"] = str(program)
-        data["label_mapping"] = str(register_class_map)
+        # data["label_mapping"] = str(register_class_map)
 
         with open("fittest_programs/"+dataset+"/fittest_program.json", 'w') as outfile:
             json.dump(data, outfile)
 
 
-def rank_remove_worst_gap(gap, fitness_scores, program_list, register_class_map, dataset):
-    # Ranking by fitness scores
-    sorted_fitness_scores = {k: v for k, v in sorted(
-        fitness_scores.items(), key=lambda item: item[1], reverse=True)}
-    print("Sorted: ", list(sorted_fitness_scores.items())[:3])
+def rank_remove_worst_gap(gap, fitness_error_scores, program_list, dataset):
+    # Ranking by fitness error scores: Less is better
+    sorted_fitness_error_scores = {k: v for k, v in sorted(
+        fitness_error_scores.items(), key=lambda item: item[1])}
+    print("Sorted: ", list(sorted_fitness_error_scores.items())[:3])
 
     sorted_program_list = [program_list[idx]
-                           for idx, score in sorted_fitness_scores.items()]
+                           for idx, score in sorted_fitness_error_scores.items()]
 
     # Remove weak programs
     program_list = sorted_program_list[:int(
@@ -152,13 +143,13 @@ def rank_remove_worst_gap(gap, fitness_scores, program_list, register_class_map,
 
     # Save fittest program if fittest
     save_fittest_individual(
-        program_list[0], fitness_scores[list(fitness_scores.keys())[0]], register_class_map, dataset)
+        program_list[0], fitness_error_scores[list(fitness_error_scores.keys())[0]], dataset)
 
     print(len(program_list))
 
-    # Resetting the indices of sorted_fitness_scores to avoid repeated fitness evaluation
+    # Resetting the indices of sorted_fitness_error_scores to avoid repeated fitness evaluation
     new_fitness_map = {idx: score for idx, score in enumerate(
-        list(sorted_fitness_scores.values())[:int(len(sorted_program_list)*(1-gap/100))])}
+        list(sorted_fitness_error_scores.values())[:int(len(sorted_program_list)*(1-gap/100))])}
 
     return program_list, new_fitness_map
 

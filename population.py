@@ -10,7 +10,7 @@ def uniform_random_choice(choice_list):
 
 def get_program_counter(pop_size):
     # Chooses program size for population uniformly
-    uniform_pc_array = np.random.uniform(30, 50, pop_size)
+    uniform_pc_array = np.random.uniform(5, 15, pop_size)
     return [int(round(x, 0)) for x in list(uniform_pc_array)]
 
 
@@ -44,8 +44,6 @@ def get_individuals(pc_list, select, target_r, source_r, ops, source_x):
 
 
 def initialize_population(df, operators_mapping, pop_size, NUMBER_OF_REGISTERS):
-    number_of_classes = len(set(df[df.columns.values[-1]].tolist()))
-
     # Select bit
     select = [0, 1]
 

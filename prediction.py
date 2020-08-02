@@ -16,14 +16,19 @@ def load_best_program(program_path):
             data = json.load(json_file)
 
         program = ast.literal_eval(data["program"])
-        register_class_map = ast.literal_eval(data["label_mapping"])
 
-        return program, register_class_map
+        return program
 
-    return [], {}
+    return []
 
 
-def classifier_accuracy(y_pred, y_actual):
+def get_mae_prediction_error(y_pred, y_actual):
+    mae = metrics.mean_absolute_error(y_actual, y_pred)
+
+    return mae
+
+
+def predictor_accuracy(y_pred, y_actual):
     if type(y_pred) == list:
         y_pred = np.array(y_pred)
 
@@ -45,41 +50,41 @@ def classifier_accuracy(y_pred, y_actual):
     return accuracy
 
 
-def classifier_detection_rate(y_pred, y_actual, number_of_labels):
-    sum_dr = 0.0
+# def classifier_detection_rate(y_pred, y_actual, number_of_labels):
+#     sum_dr = 0.0
 
-    if type(y_pred) == list:
-        y_pred = np.array(y_pred)
+#     if type(y_pred) == list:
+#         y_pred = np.array(y_pred)
 
-    if type(y_actual) == list:
-        y_actual = np.array(y_actual)
+#     if type(y_actual) == list:
+#         y_actual = np.array(y_actual)
 
-    unique_labels = set(y_actual.tolist())
-    print(y_actual, y_pred, unique_labels)
-    # Sum the detection rate for each label
-    for label in unique_labels:
-        tp = sum((y_actual == label) & (y_pred == label))
-        fn = sum((y_actual == label) & (y_pred != label))
+#     unique_labels = set(y_actual.tolist())
+#     print(y_actual, y_pred, unique_labels)
+#     # Sum the detection rate for each label
+#     for label in unique_labels:
+#         tp = sum((y_actual == label) & (y_pred == label))
+#         fn = sum((y_actual == label) & (y_pred != label))
 
-        dr = tp / (tp + fn)
-        # print("DR for label, ", label, ": ", dr)
-        sum_dr += dr
+#         dr = tp / (tp + fn)
+#         # print("DR for label, ", label, ": ", dr)
+#         sum_dr += dr
 
-    DR = sum_dr / number_of_labels
-    print("Avg DR: ", DR)
+#     DR = sum_dr / number_of_labels
+#     print("Avg DR: ", DR)
 
-    return DR
+#     return DR
 
 
-def predict(input_list, program_path, NUMBER_OF_REGISTERS, register_class_map=None):
+def predict(input_list, program_path, NUMBER_OF_REGISTERS):
     prediction_list = []
 
     if type(program_path) == str:
-        program, register_class_map = load_best_program(program_path)
+        program = load_best_program(program_path)
     else:
         program = program_path
 
-    if program and register_class_map:
+    if program:
         vr_obj = VariableReference(NUMBER_OF_REGISTERS)
 
         operators_mapping = {0: operations.add, 1: operations.sub,
@@ -98,10 +103,11 @@ def predict(input_list, program_path, NUMBER_OF_REGISTERS, register_class_map=No
             sorted_registers = {k: v for k, v in sorted(
                 registers.items(), key=lambda item: item[1], reverse=True)}
 
-            for k in sorted_registers:
-                if k in register_class_map.keys():
-                    prediction_list.append(register_class_map[k])
-                    break
+            # for k in sorted_registers:
+            #     if k in register_class_map.keys():
+            #         prediction_list.append(register_class_map[k])
+            #         break
+            prediction_list.append(sorted_registers.values[0])
     else:
         print("No saved program found")
 
@@ -193,7 +199,6 @@ def predict_and_save_best_classifier(program_list, X_train, y_train, register_cl
 
 
 def save_confusion_matrix(y_true, y_pred, dataset, st, score_type):
-    # cm = metrics.confusion_matrix(y_true, y_pred)
     filename = 'confusion_matrix_'+dataset+'_'+st+'_'+score_type
 
     cm = ConfusionMatrix(y_true, y_pred)

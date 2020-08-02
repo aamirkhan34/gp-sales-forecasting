@@ -112,7 +112,7 @@ def compare_fitness_scores(offspring, offspring_mutated, vr_obj, X_train_t, y_tr
     return fit_score_offspring == fit_score_offspring_mutated
 
 
-def mutation(offsprings, source_x, target_r, source_r, ops, vr_obj, X_train_t, y_train_t, register_class_map):
+def mutation(offsprings, source_x, target_r, source_r, ops, vr_obj, X_train_t, y_train_t):
     mutated_offsprings = []
 
     for offspring in offsprings:

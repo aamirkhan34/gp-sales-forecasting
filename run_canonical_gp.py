@@ -13,10 +13,8 @@ import numpy as np
 import pandas as pd
 
 # application imports
-import iris
-import shuttle
-import thyroid
-import tic_tac_toe
+import walmart
+import rossmann
 import operations
 import population
 import prediction
@@ -47,7 +45,7 @@ if __name__ == '__main__':
     p.add_argument('--t', metavar='Training subset size', type=int,
                    help='Training subset size, default to 200', choices=[200, 300, 500], default=200)
     p.add_argument('--st', metavar='Sampling technique', type=str,
-                   help="Sampling technique, default to 'uniformly'", choices=["uniformly", "equally"],
+                   help="Sampling technique, default to 'uniformly'", choices=["uniformly"],
                    default="uniformly")
     p.add_argument('--rp', metavar='Re-sampling period', type=int,
                    help='Re-sampling period, default to 5 generations', choices=[5, 10, 15, 20, 25], default=5)
@@ -69,15 +67,14 @@ if __name__ == '__main__':
         operators_mapping = {0: operations.add, 1: operations.sub,
                              2: operations.mul_by_2, 3: operations.div_by_2}
 
-        data_module_mapping = {"shuttle": shuttle, "thyroid": thyroid,
-                               "tic-tac-toe": tic_tac_toe, "iris": iris}
+        data_module_mapping = {"walmart": walmart, "rossmann": rossmann}
 
         # Load dataset
         df = data_module_mapping[args.d].load_dataset(args.d)
 
         # Validate and get number of registers
         NUMBER_OF_REGISTERS = data_module_mapping[args.d].validate_get_register_count(
-            NUMBER_OF_REGISTERS, df)
+            NUMBER_OF_REGISTERS)
 
         vr_obj = VariableReference(NUMBER_OF_REGISTERS)
         print('\nInitial Registers:')
