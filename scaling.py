@@ -30,7 +30,7 @@ def min_max_train_test_scaling(X_train, X_test):
     return X_train_scale, X_test_scale
 
 
-def standard_train_test_scaling(X_train, X_test):
+def standard_train_test_scaling(X_train, X_test, col_indexes_to_scale):
     # Standard scaling approach
     alpha = 1.0
 
@@ -38,19 +38,21 @@ def standard_train_test_scaling(X_train, X_test):
     X_test_scale = X_test.copy()
 
     for col in range(X_train.shape[1]):
-        col_values = X_train[:, col]
+        if col in col_indexes_to_scale:
+            col_values = X_train[:, col]
 
-        mean = np.mean(col_values)
-        standard_deviation = np.std(col_values)
+            mean = np.mean(col_values)
+            standard_deviation = np.std(col_values)
 
-        # Scaling on training data
-        scaled_values_train = alpha*((col_values - mean) / standard_deviation)
-        X_train_scale[:, col] = scaled_values_train
+            # Scaling on training data
+            scaled_values_train = alpha * \
+                ((col_values - mean) / standard_deviation)
+            X_train_scale[:, col] = scaled_values_train
 
-        # Scaling on test data using mean, std of train data
-        scaled_values_test = alpha * \
-            ((X_test[:, col] - mean) / standard_deviation)
-        X_test_scale[:, col] = scaled_values_test
+            # Scaling on test data using mean, std of train data
+            scaled_values_test = alpha * \
+                ((X_test[:, col] - mean) / standard_deviation)
+            X_test_scale[:, col] = scaled_values_test
 
     return X_train_scale, X_test_scale
 

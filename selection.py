@@ -27,8 +27,8 @@ def decode_execute_instruction(row, instruction, operators_mapping, registers):
 
 
 def get_fitness_error_score_of_program(program, X_train, y_train, NUMBER_OF_REGISTERS, gen, dt_obj, det_track_req):
-    operators_mapping = {0: operations.add, 1: operations.sub,
-                         2: operations.mul_by_2, 3: operations.div_by_2}
+    # operators_mapping = {0: operations.add, 1: operations.sub,
+    #                      2: operations.mul_by_2, 3: operations.div_by_2}
 
     # Predict
     y_pred = prediction.predict(X_train, program, NUMBER_OF_REGISTERS)
@@ -145,7 +145,7 @@ def rank_remove_worst_gap(gap, fitness_error_scores, program_list, dataset):
     save_fittest_individual(
         program_list[0], fitness_error_scores[list(fitness_error_scores.keys())[0]], dataset)
 
-    print(len(program_list))
+    print("Program list length:", len(program_list))
 
     # Resetting the indices of sorted_fitness_error_scores to avoid repeated fitness evaluation
     new_fitness_map = {idx: score for idx, score in enumerate(

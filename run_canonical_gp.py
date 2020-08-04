@@ -34,12 +34,12 @@ if __name__ == '__main__':
                    help='Gap percentage for breeder model (value between 10-30), default to 20',
                    choices=[10, 15, 20, 25, 30], default=20)
     p.add_argument('--d', metavar='dataset', type=str,
-                   help='Dataset to be used, default to thyroid', choices=["iris", "tic-tac-toe", "shuttle", "thyroid"],
-                   default="thyroid")
+                   help='Dataset to be used, default to walmart', choices=["walmart", "rossmann"],
+                   default="walmart")
     p.add_argument('--p', metavar='population_size', type=int,
-                   help='Size of population, default to 500', choices=[100, 500, 1000, 5000, 10000], default=500)
+                   help='Size of population, default to 100', choices=[100, 500, 1000, 5000, 10000], default=100)
     p.add_argument('--g', metavar='Number of generations', type=int,
-                   help='Number of generations, default to 1000', choices=[100, 500, 1000], default=1000)
+                   help='Number of generations, default to 1000', choices=[100, 500, 1000, 5000], default=100)
     p.add_argument('--nr', metavar='Number of registers', type=int,
                    help='Number of registers, default to 4', default=4)
     p.add_argument('--t', metavar='Training subset size', type=int,
@@ -49,13 +49,16 @@ if __name__ == '__main__':
                    default="uniformly")
     p.add_argument('--rp', metavar='Re-sampling period', type=int,
                    help='Re-sampling period, default to 5 generations', choices=[5, 10, 15, 20, 25], default=5)
+    p.add_argument('--pt', metavar='Prediction technique', type=str,
+                   help="Prediction technique, default to 'forecast'", choices=["forecast", "regression"],
+                   default="forecast")
 
     args = p.parse_args()
 
     print('Parameters:')
     print("""\tTest data porportion: %d\n\tGap percentage: %d\n\tPopulation size: %d\n\tNumber of Generations: %d
-        Dataset: %s\n\tSampling technique: %s\n\tTraining subset size: %d\n\tResampling period: %d"""
-          % (args.tdp, args.gap, args.p, args.g, args.d, args.st, args.t, args.rp))
+        Dataset: %s\n\tSampling technique: %s\n\tPrediction technique: %s\n\tTraining subset size: %d\n\tResampling period: %d"""
+          % (args.tdp, args.gap, args.p, args.g, args.d, args.st, args.pt, args.t, args.rp))
 
     # OTHER PARAMETERS
     MAX_PROGRAM_SIZE = 64
@@ -69,9 +72,6 @@ if __name__ == '__main__':
 
         data_module_mapping = {"walmart": walmart, "rossmann": rossmann}
 
-        # Load dataset
-        df = data_module_mapping[args.d].load_dataset(args.d)
-
         # Validate and get number of registers
         NUMBER_OF_REGISTERS = data_module_mapping[args.d].validate_get_register_count(
             NUMBER_OF_REGISTERS)
@@ -81,16 +81,17 @@ if __name__ == '__main__':
         print(vr_obj.get_registers())
 
         # Preprocess
-        df = data_module_mapping[args.d].preprocess_data(df)
+        df = data_module_mapping[args.d].preprocess_data(args.d, args.pt)
 
         # Initialize population: returns list of individuals
         program_list = population.initialize_population(
             df, operators_mapping, args.p, NUMBER_OF_REGISTERS)
 
         # Run GP
-        generation.run_each_generation(
-            program_list, args.g, df, args.gap, args.tdp, MAX_PROGRAM_SIZE, args.d,
-            NUMBER_OF_REGISTERS, vr_obj, data_module_mapping, args.t, args.rp, args.st)
+        # generation.run_each_generation(
+        #     program_list, args.g, df, args.gap, args.tdp, MAX_PROGRAM_SIZE, args.d,
+        #     NUMBER_OF_REGISTERS, vr_obj, data_module_mapping, args.t, args.rp, args.st,
+        #     args.pt)
 
         print('Overall time: '+str(round(timeit.default_timer() -
                                          overall_start, 3))+' seconds.\n')

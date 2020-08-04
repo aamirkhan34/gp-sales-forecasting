@@ -7,8 +7,14 @@ import selection
 import population
 
 
-def check_max_prog_size(MAX_PROGRAM_SIZE):
-    pass
+def valid_prog_size(program, repl_points, ins_points, MAX_PROGRAM_SIZE):
+    program_size = len(
+        program) - (repl_points[1] - repl_points[0]) + (ins_points[1] - ins_points[0])
+
+    if program_size > MAX_PROGRAM_SIZE:
+        return False
+
+    return True
 
 
 def two_point_crossover(prog1, prog2, MAX_PROGRAM_SIZE):
@@ -33,12 +39,72 @@ def two_point_crossover(prog1, prog2, MAX_PROGRAM_SIZE):
     return prog1_matrix.tolist(), prog2_matrix.tolist()
 
 
+def get_program_replacement_points(prog1, prog2):
+    if len(prog1) == 1:
+        prog1_points = [0, 1]
+    else:
+        prog1_points = random.sample(list(range(0, len(prog1))), k=2)
+
+    if len(prog2) == 1:
+        prog2_points = [0, 1]
+    else:
+        prog2_points = random.sample(list(range(0, len(prog2))), k=2)
+
+    prog1_points.sort()
+    prog2_points.sort()
+
+    return prog1_points, prog2_points
+
+
+def insert_xover_elements(data_to_be_inserted, program, insert_index):
+    for instruction in data_to_be_inserted:
+        program.insert(insert_index, instruction)
+        insert_index += 1
+
+    return program
+
+
+def evolving_two_point_crossover(prog1, prog2, MAX_PROGRAM_SIZE):
+    xover_success = False
+
+    prog1_points, prog2_points = get_program_replacement_points(prog1, prog2)
+
+    if valid_prog_size(prog1, prog1_points, prog2_points, MAX_PROGRAM_SIZE) and valid_prog_size(prog2, prog2_points, prog1_points, MAX_PROGRAM_SIZE):
+        prog1_replacement_index = prog1_points[0]
+        prog2_replacement_index = prog2_points[0]
+
+        prog1_xover_data = prog1[prog1_points[0]:prog1_points[1]]
+        prog2_xover_data = prog2[prog2_points[0]:prog2_points[1]]
+
+        # Delete sliced entries
+        del prog1[prog1_points[0]:prog1_points[1]]
+        del prog2[prog2_points[0]:prog2_points[1]]
+
+        # Perform crossover
+        prog1 = insert_xover_elements(
+            prog2_xover_data, prog1, prog1_replacement_index)
+
+        prog2 = insert_xover_elements(
+            prog1_xover_data, prog2, prog2_replacement_index)
+
+        xover_success = True
+
+    return prog1, prog2, xover_success
+
+
 def crossover(selected_programs, gap, MAX_PROGRAM_SIZE):
     offsprings = []
 
-    for i in range(int(gap/2)):
-        offspring1, offspring2 = two_point_crossover(
-            selected_programs[i], selected_programs[gap-1-i], MAX_PROGRAM_SIZE)
+    sel_prog_size = len(selected_programs)
+
+    for i in range(int(sel_prog_size/2)):
+        offspring1, offspring2, success = evolving_two_point_crossover(
+            selected_programs[i], selected_programs[sel_prog_size-1-i], MAX_PROGRAM_SIZE)
+
+        # Perform fixed length two point crossover if evolving crossover fails
+        if not success:
+            offspring1, offspring2 = two_point_crossover(
+                selected_programs[i], selected_programs[sel_prog_size-1-i], MAX_PROGRAM_SIZE)
 
         offsprings.append(offspring1)
         offsprings.append(offspring2)

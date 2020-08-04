@@ -107,7 +107,7 @@ def predict(input_list, program_path, NUMBER_OF_REGISTERS):
             #     if k in register_class_map.keys():
             #         prediction_list.append(register_class_map[k])
             #         break
-            prediction_list.append(sorted_registers.values[0])
+            prediction_list.append(list(sorted_registers.values())[0])
     else:
         print("No saved program found")
 
@@ -187,11 +187,11 @@ def predict_and_save_best_classifier(program_list, X_train, y_train, register_cl
             best_y_pred_dr = y_pred
 
     # Save classifier with highest DR
-    save_champion_classifier(champ_classifier_by_dr, "DetectionRate", champ_classifier_dr,
-                             register_class_map, dataset, st)
+    # save_champion_classifier(champ_classifier_by_dr, "DetectionRate", champ_classifier_dr,
+    #                          register_class_map, dataset, st)
 
     # Save classifier with highest Accuracy
-    save_champion_classifier(champ_classifier_by_acc, "Accuracy", champ_classifier_acc,
+    save_champion_classifier(champ_classifier_by_acc, "MAE", champ_classifier_acc,
                              register_class_map, dataset, st)
 
     print(metrics.classification_report(y_train, best_y_pred_acc, digits=3))
