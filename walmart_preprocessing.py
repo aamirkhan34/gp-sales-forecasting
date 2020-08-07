@@ -84,8 +84,11 @@ class WalmartPreprocessingRegression(WalmartPreprocessing):
 
         return df
 
-    # def add_month_feature(self, df):
-    #     return df
+    def add_month_feature(self, df):
+        # Add column for month
+        df["Month"] = pd.to_datetime(df["Date"], format="%Y-%m-%d").dt.month
+
+        return df
 
     def add_day_feature(self, df):
         # Add column for day
@@ -100,16 +103,37 @@ class WalmartPreprocessingRegression(WalmartPreprocessing):
 
         return df
 
+    def add_black_friday_features(self, df):
+        # Add column for days to next Christmas
+        df['Black_Friday'] = np.where((df['Date_Type'] == datetime(2010, 11, 26).date()) | (
+            df['Date_Type'] == datetime(2011, 11, 25).date()), 1, 0)
+
+        return df
+
+    def add_pre_christmas_features(self, df):
+        # Add column for days to next Christmas
+        df['Pre_christmas'] = np.where((df['Date_Type'] == datetime(2010, 12, 23).date()) | (df['Date_Type'] == datetime(2010, 12, 24).date()) | (
+            df['Date_Type'] == datetime(2011, 12, 23).date()) | (df['Date_Type'] == datetime(2011, 12, 24).date()), 1, 0)
+
+        return df
+
     def get_date_features(self, df):
+        df['Date_Type'] = [datetime.strptime(
+            date, '%Y-%m-%d').date() for date in df['Date'].astype(str).values.tolist()]
+
         # Sorting data with respect to date since time-series data
         df = df.sort_values(by='Date')
 
         df = self.add_year_feature(df)
+        df = self.add_month_feature(df)
         df = self.add_day_feature(df)
         df = self.add_days_until_christmas_feature(df)
+        df = self.add_black_friday_features(df)
+        df = self.add_pre_christmas_features(df)
 
         # Remove Date column
         df.drop("Date", axis=1, inplace=True)
+        df.drop("Date_Type", axis=1, inplace=True)
 
         return df
 
@@ -118,9 +142,25 @@ class WalmartPreprocessingRegression(WalmartPreprocessing):
 
         return df
 
+    def get_one_hot_encoded_feature(self, df, column):
+        df[column] = column+'_' + df[column].map(str)
+
+        tp = pd.get_dummies(df[column])
+        df = pd.concat([df, tp], axis=1)
+        df = df.drop(columns=column)
+
+        return df
+
     def drop_encoded_columns(self, df, columns):
         for col in columns:
             df = df.drop(columns=col)
+
+        return df
+
+    def encode_other_features(self, df):
+        df = self.get_one_hot_encoded_feature(df, "Month")
+        # df = self.get_one_hot_encoded_feature(df, "Black_Friday")
+        # df = self.get_one_hot_encoded_feature(df, "Pre_christmas")
 
         return df
 
@@ -133,8 +173,11 @@ class WalmartPreprocessingRegression(WalmartPreprocessing):
 
         df = self.drop_encoded_columns(df, ["Type", "Store", "Dept"])
 
-        df = self.replace_boolean_with_int(df)
+        df = self.encode_other_features(df)
 
+        df = self.replace_boolean_with_int(df)
+        print("All columns: ")
+        print(df.columns.values)
         return df
 
 
@@ -203,11 +246,11 @@ class WalmartPreprocessingForecasting(WalmartPreprocessing):
 
     def get_median_sales(self, df):
         medians = pd.DataFrame({'Median Sales': df.loc[df['Split'] == 'Train'].groupby(
-            by=['Type', 'Dept', 'Store', 'Month', 'IsHoliday_x'])['Weekly_Sales'].median()}).reset_index()
+            by=['Type', 'Dept', 'Store', 'Month', 'IsHoliday'])['Weekly_Sales'].median()}).reset_index()
 
         # Merge by type, store, department and month
         df = df.merge(medians, how='outer', on=[
-                      'Type', 'Dept', 'Store', 'Month', 'IsHoliday_x'])
+                      'Type', 'Dept', 'Store', 'Month', 'IsHoliday'])
 
         # Fill Null values
         df['Median Sales'].fillna(
@@ -215,7 +258,7 @@ class WalmartPreprocessingForecasting(WalmartPreprocessing):
 
         # Create a key for easy access
         df['Key'] = df['Type'].map(
-            str)+df['Dept'].map(str)+df['Store'].map(str)+df['Date'].map(str)+df['IsHoliday_x'].map(str)
+            str)+df['Dept'].map(str)+df['Store'].map(str)+df['Date'].map(str)+df['IsHoliday'].map(str)
 
         return df
 
@@ -242,8 +285,8 @@ class WalmartPreprocessingForecasting(WalmartPreprocessing):
                 sorted_df.at[index, 'Lagged_Available'] = 0
 
             last = row  # Remember last row for speed
-            if(index % int(row_len/10) == 0):  # See progress by printing every 10% interval
-                print(str(int(index*100/row_len))+'% loaded')
+            # if(index % int(row_len/10) == 0):  # See progress by printing every 10% interval
+            #     print(str(int(index*100/row_len))+'% loaded')
 
         return sorted_df
 
@@ -272,16 +315,16 @@ class WalmartPreprocessingForecasting(WalmartPreprocessing):
         return df
 
     def remove_unwanted_features(self, df):
-        unwanted_cols = ["Store", "Dept", "Date",
-                         "Date_Type", "Key", "Weekly_Sales", "Type", "Month", "Date_Lagged"]
+        unwanted_cols = ["Store", "Dept", "Date", "Date_Type", "Key", "Weekly_Sales",
+                         "Type", "Month", "Date_Lagged", "Median Sales", "Black_Friday",
+                         "Pre_christmas"]
 
         wanted_cols = []
 
         for col in list(df.columns.values):
-            if not col in unwanted_cols:
+            if col not in unwanted_cols:
                 wanted_cols.append(col)
 
-        print(wanted_cols)
         final_df = df[wanted_cols]
 
         return final_df
@@ -302,6 +345,5 @@ class WalmartPreprocessingForecasting(WalmartPreprocessing):
         df = self.get_lagged_variables(df)
 
         df = self.remove_unwanted_features(df)
-        print(df.shape)
-        print(df.head())
+
         return df

@@ -19,6 +19,7 @@ import operations
 import population
 import prediction
 import generation
+import prediction_charts_data
 from variable_references import VariableReference
 
 __author__ = "Aamir Shoeb Alam Khan"
@@ -37,13 +38,13 @@ if __name__ == '__main__':
                    help='Dataset to be used, default to walmart', choices=["walmart", "rossmann"],
                    default="walmart")
     p.add_argument('--p', metavar='population_size', type=int,
-                   help='Size of population, default to 100', choices=[100, 500, 1000, 5000, 10000], default=100)
+                   help='Size of population, default to 100', choices=[100, 250, 500, 1000, 5000, 10000], default=250)
     p.add_argument('--g', metavar='Number of generations', type=int,
-                   help='Number of generations, default to 1000', choices=[100, 500, 1000, 5000], default=100)
+                   help='Number of generations, default to 500', choices=[100, 500, 1000, 5000], default=500)
     p.add_argument('--nr', metavar='Number of registers', type=int,
                    help='Number of registers, default to 4', default=4)
     p.add_argument('--t', metavar='Training subset size', type=int,
-                   help='Training subset size, default to 200', choices=[200, 300, 500], default=200)
+                   help='Training subset size, default to 200', choices=[200, 300, 400, 500], default=200)
     p.add_argument('--st', metavar='Sampling technique', type=str,
                    help="Sampling technique, default to 'uniformly'", choices=["uniformly"],
                    default="uniformly")
@@ -67,8 +68,11 @@ if __name__ == '__main__':
     try:
         overall_start = timeit.default_timer()
 
+        # operators_mapping = {0: operations.add, 1: operations.sub,
+        #                      2: operations.mul_by_2, 3: operations.div_by_2}
         operators_mapping = {0: operations.add, 1: operations.sub,
-                             2: operations.mul_by_2, 3: operations.div_by_2}
+                             2: operations.mul_by_2, 3: operations.div_by_2,
+                             4: operations.conditional}
 
         data_module_mapping = {"walmart": walmart, "rossmann": rossmann}
 
@@ -82,16 +86,18 @@ if __name__ == '__main__':
 
         # Preprocess
         df = data_module_mapping[args.d].preprocess_data(args.d, args.pt)
+        # if args.pt == "forecast":
+        #     prediction_charts_data.save_data_for_forecast(df)
 
         # Initialize population: returns list of individuals
         program_list = population.initialize_population(
             df, operators_mapping, args.p, NUMBER_OF_REGISTERS)
 
         # Run GP
-        # generation.run_each_generation(
-        #     program_list, args.g, df, args.gap, args.tdp, MAX_PROGRAM_SIZE, args.d,
-        #     NUMBER_OF_REGISTERS, vr_obj, data_module_mapping, args.t, args.rp, args.st,
-        #     args.pt)
+        generation.run_each_generation(
+            program_list, args.g, df, args.gap, args.tdp, MAX_PROGRAM_SIZE, args.d,
+            NUMBER_OF_REGISTERS, vr_obj, data_module_mapping, args.t, args.rp, args.st,
+            args.pt)
 
         print('Overall time: '+str(round(timeit.default_timer() -
                                          overall_start, 3))+' seconds.\n')

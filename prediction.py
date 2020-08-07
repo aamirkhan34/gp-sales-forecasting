@@ -87,8 +87,11 @@ def predict(input_list, program_path, NUMBER_OF_REGISTERS):
     if program:
         vr_obj = VariableReference(NUMBER_OF_REGISTERS)
 
+        # operators_mapping = {0: operations.add, 1: operations.sub,
+        #                      2: operations.mul_by_2, 3: operations.div_by_2}
         operators_mapping = {0: operations.add, 1: operations.sub,
-                             2: operations.mul_by_2, 3: operations.div_by_2}
+                             2: operations.mul_by_2, 3: operations.div_by_2,
+                             4: operations.conditional}
 
         for idx in range(len(input_list)):
             # Reset and get registers
@@ -114,7 +117,7 @@ def predict(input_list, program_path, NUMBER_OF_REGISTERS):
     return prediction_list
 
 
-def save_champion_classifier(program, score_type, score, register_class_map, dataset, st):
+def save_champion_predictor(program, score_type, train_score, test_score, avg_score, dataset, prediction_type):
     data = {}
 
     if "best_programs" not in os.listdir():
@@ -123,83 +126,117 @@ def save_champion_classifier(program, score_type, score, register_class_map, dat
     if dataset not in os.listdir("best_programs/"):
         os.makedirs("best_programs/"+dataset)
 
-    if st not in os.listdir("best_programs/"+dataset+"/"):
-        os.makedirs("best_programs/"+dataset+"/"+st)
+    if prediction_type not in os.listdir("best_programs/"+dataset+"/"):
+        os.makedirs("best_programs/"+dataset+"/"+prediction_type)
 
-    if score_type not in os.listdir("best_programs/"+dataset+"/"+st+"/"):
-        os.makedirs("best_programs/"+dataset+"/"+st+"/"+score_type)
-
-    if "best_program.json" in os.listdir("best_programs/"+dataset+"/"+st+"/"+score_type+"/"):
-        with open("best_programs/"+dataset+"/"+st+"/"+score_type+"/best_program.json", "r") as json_file:
+    if "best_program.json" in os.listdir("best_programs/"+dataset+"/"+prediction_type+"/"):
+        with open("best_programs/"+dataset+"/"+prediction_type+"/best_program.json", "r") as json_file:
             data = json.load(json_file)
 
     if data:
-        if data[score_type] < score:
-            data[score_type] = score
+        if avg_score < data["Avg_"+score_type]:
+            data["Avg_"+score_type] = avg_score
+            data["Train_"+score_type] = train_score
+            data["Test_"+score_type] = test_score
             data["program"] = str(program)
-            data["label_mapping"] = str(register_class_map)
 
-            with open("best_programs/"+dataset+"/"+st+"/"+score_type+"/best_program.json", 'w') as outfile:
+            with open("best_programs/"+dataset+"/"+prediction_type+"/best_program.json", 'w') as outfile:
                 json.dump(data, outfile)
     else:
-        data[score_type] = score
+        data["Avg_"+score_type] = avg_score
+        data["Train_"+score_type] = train_score
+        data["Test_"+score_type] = test_score
         data["program"] = str(program)
-        data["label_mapping"] = str(register_class_map)
 
-        with open("best_programs/"+dataset+"/"+st+"/"+score_type+"/best_program.json", 'w') as outfile:
+        with open("best_programs/"+dataset+"/"+prediction_type+"/best_program.json", 'w') as outfile:
             json.dump(data, outfile)
 
 
-def predict_and_save_best_classifier(program_list, X_train, y_train, register_class_map,
-                                     NUMBER_OF_REGISTERS, dataset, st):
-    number_of_labels = len(register_class_map.keys())
+def get_binary_outcome(pred_list):
+    pred_list_binary = []
 
-    champ_classifier_by_dr = program_list[0]
-    champ_classifier_by_acc = program_list[0]
+    for pred in pred_list:
+        if pred < 0:
+            pred_list_binary.append(0)
+        else:
+            pred_list_binary.append(1)
 
-    best_y_pred = predict(
-        X_train, program_list[0], NUMBER_OF_REGISTERS, register_class_map)
-
-    best_y_pred_acc = best_y_pred
-    best_y_pred_dr = best_y_pred
-
-    champ_classifier_dr = classifier_detection_rate(
-        best_y_pred, y_train, number_of_labels)
-
-    champ_classifier_acc = classifier_accuracy(best_y_pred, y_train)
-
-    for program in program_list[1:]:
-        y_pred = predict(
-            X_train, program, NUMBER_OF_REGISTERS, register_class_map)
-
-        program_accuracy = classifier_accuracy(y_pred, y_train)
-        program_detection_rate = classifier_detection_rate(
-            y_pred, y_train, number_of_labels)
-
-        if program_accuracy > champ_classifier_acc:
-            champ_classifier_acc = program_accuracy
-            champ_classifier_by_acc = program
-            best_y_pred_acc = y_pred
-
-        if program_detection_rate > champ_classifier_dr:
-            champ_classifier_dr = program_detection_rate
-            champ_classifier_by_dr = program
-            best_y_pred_dr = y_pred
-
-    # Save classifier with highest DR
-    # save_champion_classifier(champ_classifier_by_dr, "DetectionRate", champ_classifier_dr,
-    #                          register_class_map, dataset, st)
-
-    # Save classifier with highest Accuracy
-    save_champion_classifier(champ_classifier_by_acc, "MAE", champ_classifier_acc,
-                             register_class_map, dataset, st)
-
-    print(metrics.classification_report(y_train, best_y_pred_acc, digits=3))
-    print(metrics.classification_report(y_train, best_y_pred_dr, digits=3))
+    return pred_list_binary
 
 
-def save_confusion_matrix(y_true, y_pred, dataset, st, score_type):
-    filename = 'confusion_matrix_'+dataset+'_'+st+'_'+score_type
+def get_binary_prediction_lists(y_test, X_test, dataset, NUMBER_OF_REGISTERS):
+    program_path = "best_programs/"+dataset+"/forecast/best_program.json"
+    best_program = load_best_program(program_path)
+
+    y_pred = predict(X_test, best_program, NUMBER_OF_REGISTERS)
+
+    y_test_binary = get_binary_outcome(y_test)
+    y_pred_binary = get_binary_outcome(y_pred)
+
+    return y_pred_binary, y_test_binary
+
+
+def print_ytest_ypred(y_test, X_test, dataset, pt, NUMBER_OF_REGISTERS):
+    program_path = "best_programs/"+dataset+"/"+pt+"/best_program.json"
+    best_program = load_best_program(program_path)
+
+    y_pred = predict(X_test, best_program, NUMBER_OF_REGISTERS)
+    print(len(y_pred), len(y_test))
+    print("ytest: ", y_test.tolist())
+    print("ypred: ", y_pred)
+
+
+def predict_and_save_best_program(training_prediction_error, best_programs, X_train, y_train, X_test, y_test,
+                                  prediction_type, NUMBER_OF_REGISTERS, dataset, st):
+    test_prediction_error = []
+    avg_train_test_error = []
+    # y_train_binary = get_binary_outcome(y_test)
+
+    for program in best_programs:
+        y_pred = predict(X_test, program, NUMBER_OF_REGISTERS)
+
+        program_err = get_mae_prediction_error(y_pred, y_test)
+
+        test_prediction_error.append(program_err)
+
+    best_prog = best_programs[0]
+    best_mae = (training_prediction_error[0] + test_prediction_error[0])/2
+    mae_training = training_prediction_error[0]
+    mae_test = test_prediction_error[0]
+
+    print("Training error: ", training_prediction_error)
+    print("Testing error: ", test_prediction_error)
+
+    for idx in range(1, len(best_programs)):
+        avg_error = (
+            training_prediction_error[idx] + test_prediction_error[idx])/2
+
+        avg_train_test_error.append(avg_error)
+
+        if avg_error < best_mae:
+            best_mae = avg_error
+            best_prog = best_programs[idx]
+            mae_training = training_prediction_error[idx]
+            mae_test = test_prediction_error[idx]
+
+    # Save predictor with least Mean Absolute Error
+    save_champion_predictor(best_prog, "MAE", mae_training, mae_test, best_mae,
+                            dataset, prediction_type)
+
+    # Predict, convert to binary, and save confusion matrix for forecast
+    if prediction_type == "forecast":
+        y_pred_binary, y_test_binary = get_binary_prediction_lists(
+            y_test, X_test, dataset, NUMBER_OF_REGISTERS)
+
+        save_confusion_matrix(y_test_binary, y_pred_binary,
+                              dataset, prediction_type)
+    else:
+        print_ytest_ypred(y_test, X_test, dataset,
+                          prediction_type, NUMBER_OF_REGISTERS)
+
+
+def save_confusion_matrix(y_true, y_pred, dataset, pt):
+    filename = 'confusion_matrix_'+dataset+'_'+pt
 
     cm = ConfusionMatrix(y_true, y_pred)
     cm.save_html(filename, color=(100, 50, 250))

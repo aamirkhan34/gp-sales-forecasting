@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 from sklearn import preprocessing
@@ -34,6 +35,10 @@ def standard_train_test_scaling(X_train, X_test, col_indexes_to_scale):
     # Standard scaling approach
     alpha = 1.0
 
+    # Temps stuff
+    # val_data = pd.read_csv("forecast_test.csv").values
+    # val_data_scale = val_data.copy()
+
     X_train_scale = X_train.copy()
     X_test_scale = X_test.copy()
 
@@ -53,6 +58,14 @@ def standard_train_test_scaling(X_train, X_test, col_indexes_to_scale):
             scaled_values_test = alpha * \
                 ((X_test[:, col] - mean) / standard_deviation)
             X_test_scale[:, col] = scaled_values_test
+
+            # Scaling on val data using mean, std of train data
+            # scaled_values_val = alpha * \
+            #     ((val_data[:, col] - mean) / standard_deviation)
+            # val_data_scale[:, col] = scaled_values_val
+
+    # if not os.path.exists("forecast_test_scaled.csv"):
+    #     np.savetxt("forecast_test_scaled.csv", val_data_scale, delimiter=",")
 
     return X_train_scale, X_test_scale
 
