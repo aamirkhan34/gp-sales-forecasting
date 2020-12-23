@@ -1,2 +1,2 @@
-# Sales forecasting
-Sales Forecasting using linear Genetic Programming
+# Sales prediction
+Sales forecasting and regression using linear Genetic Programming.
